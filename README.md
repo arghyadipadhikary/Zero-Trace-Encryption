@@ -203,6 +203,4 @@ Distributed under the **MIT License**. See `LICENSE` for details.
 
 Developed by **[Arghyadip Adhikary](https://github.com/arghyadipadhikary)** © 2026
 
-*Files face Oblivion. Your privacy endures.*
-
 </div>
