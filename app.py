@@ -14,16 +14,19 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-# 1. FIX: Setup absolute paths for Vercel
-base_dir = os.path.dirname(os.path.abspath(__file__))
-# If your code is in /api/app.py, we go up one level to find folders
-root_dir = os.path.abspath(os.path.join(base_dir, "..")) 
+# 1. Environment and Constants
+load_dotenv()
+MAX_FILE_SIZE = 650 * 1024 * 1024  # 650MB
+EXPIRATION_SECONDS = 10800         # 3 Hours
 
-UPLOAD_DIR = os.path.join(root_dir, "ephemeral_storage")
+# 2. Storage Setup (Vercel requires /tmp for writing)
+UPLOAD_DIR = "/tmp/ephemeral_storage"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-EXPIRATION_SECONDS = 10800  
-MAX_FILE_SIZE = 650 * 1024 * 1024  
+# 3. Path Resolution
+# base_dir is /api, root_dir is the main project folder
+base_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.abspath(os.path.join(base_dir, ".."))
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -49,16 +52,14 @@ async def lifespan(app: FastAPI):
     task.cancel()
 
 app = FastAPI(title="Secure E2EE Web Share", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# 2. FIX: Safe Static Files Mounting
+# 4. Mounting Static and Templates (Safe Paths)
 static_path = os.path.join(root_dir, "static")
 if os.path.exists(static_path):
     app.mount("/static", StaticFiles(directory=static_path), name="static")
 
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-# 3. FIX: Absolute Templates Path
 templates_path = os.path.join(root_dir, "templates")
 templates = Jinja2Templates(directory=templates_path)
 
@@ -109,7 +110,7 @@ async def download_file(request: Request, file_id: str, background_tasks: Backgr
         try:
             if os.path.exists(path) and ".burn.bin" in path:
                 os.remove(path)
-        except Exception as e:
+        except:
             pass
 
     if target_path == burn_path:
@@ -120,5 +121,3 @@ async def download_file(request: Request, file_id: str, background_tasks: Backgr
         media_type="application/octet-stream", 
         filename="encrypted.bin"
     )
-
-load_dotenv()
