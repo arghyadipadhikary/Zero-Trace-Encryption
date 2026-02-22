@@ -1,7 +1,18 @@
 {
-  "builds": [{"src": "app.py", "use": "@vercel/python"}],
+  "builds": [
+    {
+      "src": "app.py",
+      "use": "@vercel/python"
+    }
+  ],
   "routes": [
-    {"src": "/static/(.*)", "dest": "/static/$1"},
-    {"src": "/(.*)", "dest": "app.py"}
+    {
+      "src": "/static/(.*)",
+      "dest": "/static/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "app.py"
+    }
   ]
 }
