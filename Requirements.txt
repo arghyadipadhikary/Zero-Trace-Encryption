@@ -1,6 +1,6 @@
 fastapi
 uvicorn
-a2wsgi
-python-dotenv
 jinja2
+python-dotenv
+slowapi
 python-multipart
