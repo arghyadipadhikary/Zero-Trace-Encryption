@@ -1,0 +1,17 @@
+# --- Security & Secrets ---
+.env
+.env.local
+.env.*
+
+# --- Python Junk (Pycache) ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Storage & Logs ---
+ephemeral_storage/
+*.log
+
+# --- System Files ---
+.DS_Store
+Thumbs.db
