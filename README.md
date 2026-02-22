@@ -201,7 +201,7 @@ Distributed under the **MIT License**. See `LICENSE` for details.
 
 <div align="center">
 
-Developed by **[Arghyadip01](https://github.com/Arghyadip01)** © 2026
+Developed by **[Arghyadip Adhikary](https://github.com/arghyadipadhikary)** © 2026
 
 *Files face Oblivion. Your privacy endures.*
 
