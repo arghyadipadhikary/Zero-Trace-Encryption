@@ -23,10 +23,9 @@ EXPIRATION_SECONDS = 10800         # 3 Hours
 UPLOAD_DIR = "/tmp/ephemeral_storage"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# 3. Path Resolution
-# base_dir is /api, root_dir is the main project folder
-base_dir = os.path.dirname(os.path.abspath(__file__))
-root_dir = os.path.abspath(os.path.join(base_dir, ".."))
+# 3. Path Resolution - FIXED FOR ROOT STRUCTURE
+# Since app.py is in the root, BASE_DIR is your project root.
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -55,17 +54,19 @@ app = FastAPI(title="Secure E2EE Web Share", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# 4. Mounting Static and Templates (Safe Paths)
-static_path = os.path.join(root_dir, "static")
+# 4. Mounting Static and Templates (Safe Paths) - UPDATED
+static_path = os.path.join(BASE_DIR, "static")
 if os.path.exists(static_path):
     app.mount("/static", StaticFiles(directory=static_path), name="static")
 
-templates_path = os.path.join(root_dir, "templates")
+# Point Jinja2 directly to the templates folder in your root
+templates_path = os.path.join(BASE_DIR, "templates")
 templates = Jinja2Templates(directory=templates_path)
 
 @app.get("/", response_class=HTMLResponse)
 @limiter.limit("10/minute")
 async def serve_frontend(request: Request):
+    # This will now correctly look in /var/task/templates/index.html
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/upload")
