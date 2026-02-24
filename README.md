@@ -11,7 +11,6 @@
 ![Crypto API](https://img.shields.io/badge/Web_Crypto-SubtleCrypto-f59e0b?style=for-the-badge&logo=webauthn&logoColor=white)
 ![Zero Knowledge](https://img.shields.io/badge/Architecture-Zero--Knowledge-ef4444?style=for-the-badge)
 
-
 </div>
 
 <br/>
