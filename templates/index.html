@@ -3,12 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ZERO-TRACE // E2EE</title>
+    <title>ZERO-TRACE // E2EE V2.0</title>
+    
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
     <link rel="icon" type="image/png" href="/static/favicon.png">
-    <link rel="apple-touch-icon" href="/static/favicon.ico">
     
     <script>
         tailwind.config = {
@@ -21,210 +24,362 @@
                     colors: {
                         cyber: '#6366f1', 
                         burn: '#f97316',  
-                        dark: '#0f172a'   
+                        dark: '#0f172a',
+                        success: '#10b981',
+                        error: '#ef4444'
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                     }
                 }
             }
         }
     </script>
+
     <style>
         body { 
             background: radial-gradient(circle at top right, #1e1b4b, #0f172a);
             color: #e2e8f0;
+            overflow-x: hidden;
         }
         .glass {
-            background: rgba(15, 23, 42, 0.6);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
         }
-        .cyber-glow:hover {
-            box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
-            border-color: rgba(99, 102, 241, 0.6);
+        .terminal-text {
+            color: #6366f1;
+            text-shadow: 0 0 5px rgba(99, 102, 241, 0.4);
         }
+        #terminalLog::-webkit-scrollbar { width: 4px; }
+        #terminalLog::-webkit-scrollbar-thumb { background: #4338ca; border-radius: 4px; }
         
+        @keyframes blink { 50% { opacity: 0; } }
+        .cursor { animation: blink 1s step-end infinite; display: inline-block; width: 6px; height: 12px; background: #6366f1; }
+
         body::before {
-            content: " ";
+            content: "";
             display: block;
             position: fixed;
             top: 0; left: 0; bottom: 0; right: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
-            z-index: 100;
-            background-size: 100% 4px, 3px 100%;
+            background-image: 
+                linear-gradient(rgba(99, 102, 241, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(99, 102, 241, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            z-index: -1;
             pointer-events: none;
         }
     </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-6 font-sans">
+<body class="min-h-screen flex items-center justify-center p-4 sm:p-6 font-sans">
+
+    <div id="pinModal" class="fixed inset-0 bg-black/95 z-[60] hidden flex items-center justify-center backdrop-blur-md">
+        <div class="glass p-8 rounded-3xl max-w-sm w-full text-center border border-cyber/30">
+            <i class="fa-solid fa-shield-halved text-4xl text-cyber mb-4 animate-pulse"></i>
+            <h3 class="text-xl font-bold text-white mb-2 tracking-tight">ENCRYPTED_ACCESS_KEY</h3>
+            <p class="text-[10px] font-mono text-gray-500 mb-6 uppercase tracking-widest">Enter the PIN to unlock the decryption key locally.</p>
+            <input type="password" id="decryptionPin" placeholder="PIN" maxlength="4" class="w-full bg-black/50 border border-white/10 rounded-xl py-4 text-center text-cyber font-mono text-2xl tracking-[1em] outline-none focus:border-cyber/50 transition-all mb-4">
+            <button onclick="submitPin()" class="w-full bg-cyber hover:bg-indigo-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg uppercase tracking-widest text-[10px]">Verify_Credential</button>
+        </div>
+    </div>
 
     <div class="fixed top-0 left-0 w-full p-6 flex justify-between items-center pointer-events-none z-50">
-        <div class="font-mono text-[10px] tracking-[0.2em] text-cyber opacity-70">
-            SYSTEM_STATUS: <span class="text-green-400">ENCRYPTED_IDLE</span>
+        <div class="font-mono text-[10px] tracking-[0.2em] text-cyber opacity-70 bg-black/20 backdrop-blur px-2 py-1 rounded">
+            SYSTEM_STATUS: <span id="sysStatus" class="text-green-400">ENCRYPTED_IDLE</span>
         </div>
         
-        <div class="pointer-events-auto flex items-center space-x-3 glass p-2 px-4 rounded-full">
+        <div class="pointer-events-auto flex items-center space-x-3 glass p-2 px-4 rounded-full transition-all hover:border-cyber/30">
             <span class="font-mono text-[9px] font-bold text-gray-400 uppercase tracking-widest">Protocol: Burn</span>
             <label class="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" id="burnToggle" class="sr-only peer">
-                <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-burn"></div>
+                <div class="w-9 h-5 bg-gray-700/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-burn shadow-inner"></div>
             </label>
         </div>
     </div>
 
-    <div class="glass rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl relative">
-        <div class="bg-white/5 border-b border-white/10 p-4 px-8 flex justify-between items-center">
+    <div class="glass rounded-3xl w-full max-w-md overflow-hidden relative border-t border-white/10">
+        <div class="bg-white/5 border-b border-white/5 p-4 px-6 flex justify-between items-center">
             <div class="flex space-x-2">
-                <div class="w-3 h-3 rounded-full bg-red-500/50"></div>
-                <div class="w-3 h-3 rounded-full bg-yellow-500/50"></div>
-                <div class="w-3 h-3 rounded-full bg-green-500/50"></div>
+                <div class="w-2.5 h-2.5 rounded-full bg-red-500/80 shadow-lg shadow-red-500/20"></div>
+                <div class="w-2.5 h-2.5 rounded-full bg-yellow-500/80 shadow-lg shadow-yellow-500/20"></div>
+                <div class="w-2.5 h-2.5 rounded-full bg-green-500/80 shadow-lg shadow-green-500/20"></div>
             </div>
-            <div class="font-mono text-xs text-gray-400 uppercase tracking-tighter">Secure_Tunnel_v1.0</div>
+            <div class="font-mono text-[10px] text-gray-500 uppercase tracking-wider">ZeroTrace_Node_v2.0</div>
         </div>
 
-        <div class="p-10">
-            <div class="text-center mb-10">
-                <h2 class="text-3xl font-extrabold tracking-tighter text-white mb-2 underline decoration-cyber">ZERO-TRACE</h2>
-                <p class="text-xs font-mono text-cyber opacity-80 uppercase tracking-widest italic">Zero-Knowledge Transmission</p>
+        <div class="p-8 sm:p-10">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-black tracking-tighter text-white mb-1 drop-shadow-lg">ZERO<span class="text-cyber">TRACE</span></h1>
+                <p class="text-[10px] font-mono text-cyber/80 uppercase tracking-[0.3em]">Client-Side Plausible Deniability</p>
             </div>
 
             <div id="uploadBox" class="space-y-6">
-                <div id="dropZone" class="group border-2 border-dashed border-white/10 rounded-2xl p-10 text-center cursor-pointer hover:border-cyber/50 hover:bg-cyber/5 transition-all duration-500 relative overflow-hidden" onclick="document.getElementById('fileInput').click()">
-                    <div class="relative z-10">
-                        <i class="fa-solid fa-terminal text-3xl text-cyber mb-4 group-hover:scale-110 transition-transform"></i>
-                        <p class="text-gray-300 font-medium tracking-tight">DROP_FILE_HERE</p>
-                        <p class="text-[10px] font-mono text-gray-500 mt-2 uppercase tracking-tighter">Limit: 650MB // AES-256-GCM</p>
+                <div id="dropZone" class="group border-2 border-dashed border-white/10 rounded-2xl p-8 text-center cursor-pointer hover:border-cyber/40 hover:bg-cyber/5 transition-all duration-300 relative overflow-hidden min-h-[200px] flex flex-col justify-center items-center" onclick="document.getElementById('fileInput').click()">
+                    
+                    <div id="terminal" class="hidden w-full h-full absolute inset-0 bg-black/80 p-4 text-left font-mono text-[10px] terminal-text z-20 overflow-hidden">
+                        <div id="terminalLog" class="h-full overflow-y-auto space-y-1 pb-4"></div>
+                        <div class="absolute bottom-4 left-4"><span class="cursor"></span></div>
+                    </div>
+
+                    <div id="dropZoneContent" class="relative z-10 transition-opacity duration-300 group-hover:opacity-80">
+                        <div class="w-16 h-16 bg-cyber/10 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                            <i class="fa-solid fa-ghost text-2xl text-cyber"></i>
+                        </div>
+                        <p class="text-gray-200 font-bold text-sm tracking-tight mb-1">DROP_FILE_HERE</p>
+                        <p class="text-[9px] font-mono text-gray-500 uppercase tracking-widest">
+                            Client-Side AES-256</p>
                     </div>
                     <input type="file" id="fileInput" class="hidden" onchange="handleFileSelect()">
                 </div>
 
-                <div id="fileInfo" class="hidden glass bg-white/5 p-4 rounded-xl flex justify-between items-center border border-white/10">
-                    <div class="flex items-center truncate">
-                        <i class="fa-solid fa-code text-cyber mr-3"></i>
-                        <span id="fileNameDisplay" class="text-xs font-mono text-gray-300 truncate"></span>
+                <div id="pinSetup" class="hidden glass bg-white/5 p-4 rounded-xl border border-white/5 space-y-4">
+                    <div class="flex items-center space-x-2">
+                        <input type="checkbox" id="usePin" class="accent-cyber cursor-pointer h-4 w-4" onchange="togglePinInputs()">
+                        <label for="usePin" class="text-[9px] font-mono text-gray-400 uppercase tracking-widest cursor-pointer">Enable Master & Duress PINs</label>
                     </div>
-                    <button onclick="clearSelection()" class="text-gray-500 hover:text-red-400 transition-colors px-2">
-                        <i class="fa-solid fa-circle-xmark"></i>
-                    </button>
-                </div>
-
-                <button id="uploadBtn" onclick="handleUpload()" class="hidden w-full bg-cyber hover:bg-indigo-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg hover:shadow-indigo-500/20 active:scale-95 uppercase tracking-widest text-xs">
-                    Initiate Encryption
-                </button>
-
-                <div id="progressContainer" class="hidden space-y-3">
-                    <div class="flex justify-between font-mono text-[10px] text-cyber tracking-widest">
-                        <span id="uploadStatus">PROCESSING...</span>
-                        <span id="progressText">0%</span>
-                    </div>
-                    <div class="w-full bg-white/5 rounded-full h-1 overflow-hidden">
-                        <div id="progressBarFill" class="bg-cyber h-full transition-all duration-300" style="width: 0%"></div>
-                    </div>
-                </div>
-
-                <div id="linkContainer" class="hidden space-y-4">
-                    <div class="p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
-                        <p id="uploadSuccessHeader" class="text-[10px] font-mono font-bold text-green-400 uppercase tracking-widest mb-3">
-                            <i class="fa-solid fa-lock mr-2"></i>Link_Generated_Successfully
-                        </p>
-                        <div class="flex items-center bg-black/40 rounded-lg p-3 border border-white/5">
-                            <input type="text" id="shareLinkInput" readonly class="w-full text-xs font-mono text-gray-400 outline-none bg-transparent truncate">
-                            <button onclick="copyLink()" class="ml-3 text-cyber hover:text-white transition-colors" title="Copy">
-                                <i class="fa-solid fa-copy"></i>
-                            </button>
+                    <div id="pinInputs" class="grid grid-cols-2 gap-3 opacity-50 pointer-events-none transition-all duration-300">
+                        <div>
+                            <p class="text-[8px] font-mono text-cyber mb-1 uppercase">Master PIN</p>
+                            <input type="password" id="masterPin" maxlength="4" placeholder="1234" class="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-center text-cyber font-mono text-sm outline-none">
+                        </div>
+                        <div>
+                            <p class="text-[8px] font-mono text-error mb-1 uppercase">Duress PIN</p>
+                            <input type="password" id="duressPin" maxlength="4" placeholder="9999" class="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-center text-error font-mono text-sm outline-none">
                         </div>
                     </div>
                 </div>
+
+                <div id="fileInfo" class="hidden glass bg-cyber/5 p-3 px-4 rounded-xl flex justify-between items-center border border-cyber/20">
+                    <div class="flex items-center truncate min-w-0">
+                        <i class="fa-solid fa-file-shield text-cyber mr-3 text-xs"></i>
+                        <span id="fileNameDisplay" class="text-xs font-mono text-gray-200 truncate pr-2"></span>
+                    </div>
+                    <button onclick="clearSelection()" class="text-gray-500 hover:text-red-400 transition-colors p-1">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <button id="uploadBtn" onclick="handleUpload()" class="hidden w-full bg-cyber hover:bg-indigo-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-cyber/20 hover:shadow-cyber/40 active:scale-[0.98] uppercase tracking-widest text-[10px]">
+                    Initialize Encryption Handshake
+                </button>
+
+                <div id="progressContainer" class="hidden space-y-2 pt-2">
+                    <div class="flex justify-between font-mono text-[9px] text-cyber tracking-widest">
+                        <span id="uploadStatus" class="animate-pulse">ESTABLISHING_TUNNEL...</span>
+                        <span id="progressText">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden border border-white/5">
+                        <div id="progressBarFill" class="bg-cyber h-full transition-all duration-200 shadow-[0_0_10px_rgba(99,102,241,0.5)]" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <div id="linkContainer" class="hidden space-y-6">
+                    <div class="flex justify-center">
+                        <div class="p-3 bg-white rounded-xl shadow-2xl relative group">
+                            <div class="absolute -inset-1 bg-gradient-to-r from-cyber to-purple-600 rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+                            <div id="qrcode" class="relative"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-green-500/5 border border-green-500/10 rounded-xl p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="text-[9px] font-mono font-bold text-green-400 uppercase tracking-widest">
+                                <i class="fa-solid fa-link mr-1"></i> Secure Link Generated
+                            </p>
+                            <span class="text-[8px] px-1.5 py-0.5 bg-green-500/10 text-green-400 rounded border border-green-500/20 font-mono">PINNED</span>
+                        </div>
+                        <div class="flex items-center bg-black/30 rounded-lg p-2.5 border border-white/5 group hover:border-cyber/30 transition-colors">
+                            <input type="text" id="shareLinkInput" readonly class="w-full text-[10px] font-mono text-gray-400 outline-none bg-transparent truncate select-all">
+                            <button onclick="copyLink()" class="ml-2 text-cyber hover:text-white transition-colors p-1.5 rounded-md hover:bg-white/5">
+                                <i class="fa-regular fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <button onclick="location.reload()" class="w-full text-[10px] font-mono text-gray-500 hover:text-white transition-colors uppercase tracking-widest">
+                        Start New Session
+                    </button>
+                </div>
             </div>
 
-            <div id="downloadBox" class="hidden text-center space-y-8">
+            <div id="downloadBox" class="hidden text-center space-y-8 py-4">
                 <div class="relative inline-block">
-                    <div class="absolute inset-0 bg-cyber rounded-full blur-2xl opacity-20"></div>
-                    <i class="fa-solid fa-vault text-6xl text-cyber relative"></i>
-                </div>
-                <div>
-                    <h3 class="text-xl font-bold text-white tracking-tight">ENCRYPTED_ASSET_DETECTED</h3>
-                    <p class="text-xs font-mono text-gray-500 mt-2 uppercase">Decryption key verified in fragment hash</p>
+                    <div class="absolute inset-0 bg-cyber rounded-full blur-3xl opacity-20 animate-pulse-slow"></div>
+                    <div class="relative w-20 h-20 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 mx-auto">
+                        <i class="fa-solid fa-vault text-4xl text-cyber"></i>
+                    </div>
                 </div>
                 
-                <button id="downloadBtn" onclick="handleDownload()" class="w-full bg-cyber hover:bg-indigo-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg uppercase tracking-widest text-xs">
-                    Authorize Decryption
-                </button>
-                <p id="downloadStatus" class="font-mono text-[10px] text-cyber uppercase tracking-widest"></p>
+                <div class="space-y-2">
+                    <h3 class="text-lg font-bold text-white tracking-tight">ENCRYPTED ASSET DETECTED</h3>
+                    <p id="countdownDisplay" class="text-[10px] font-mono text-burn uppercase tracking-widest h-4"></p>
+                </div>
+                
+                <div class="space-y-3">
+                    <button id="downloadBtn" onclick="handleDownload()" class="w-full bg-cyber hover:bg-indigo-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg hover:shadow-cyber/20 active:scale-[0.98] uppercase tracking-widest text-[10px]">
+                        Decrypt & Claim Payload
+                    </button>
+                    <p id="downloadStatus" class="font-mono text-[9px] text-gray-500 uppercase tracking-widest"></p>
+                </div>
             </div>
         </div>
 
-        <div class="bg-white/5 p-3 text-center border-t border-white/10">
-            <span class="text-[8px] font-mono text-gray-600 tracking-[0.4em] uppercase">
-                Private_Node_Protocol // <span id="sessionHex" class="text-cyber">0x6432</span>
+        <div class="bg-black/20 p-3 text-center border-t border-white/5">
+            <span class="text-[8px] font-mono text-gray-600 tracking-[0.3em] uppercase">
+                Zero_Knowledge_Node // <span id="sessionHex" class="text-cyber font-bold">0x0000</span>
             </span>
         </div>
     </div>
 
     <div class="fixed bottom-6 w-full text-center pointer-events-none z-50">
-        <p class="font-mono text-[10px] uppercase tracking-[0.3em] text-gray-600 opacity-50">
-            powered by <span class="text-cyber font-bold pointer-events-auto">Arghyadip01</span> &copy; 2026
+        <p class="font-mono text-[9px] uppercase tracking-[0.2em] text-gray-600/50">
+            Engineered by <span class="text-cyber/80 font-bold pointer-events-auto hover:text-cyber transition-colors cursor-default">Arghyadip01</span>
         </p>
     </div>
 
     <script>
-        const CHUNK_SIZE = 64 * 1024; 
+        const CHUNK_SIZE = 64 * 1024; // 64KB Chunks
         const bufferToBase64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
         const base64ToBuffer = (b64) => Uint8Array.from(atob(b64), c => c.charCodeAt(0));
 
         let selectedFile = null;
-        const dropZone = document.getElementById('dropZone');
-        const fileInput = document.getElementById('fileInput');
 
-        
+        // --- NEW: UNIVERSAL HASH PARSER ---
+        function getHashData() {
+            let raw = window.location.hash.substring(1);
+            if (!raw) return [];
+            // Handle URL Encoding and convert to safe ':' delimiter
+            raw = raw.replace(/%7C/g, ':').replace(/\|/g, ':').replace(/%3A/g, ':');
+            return raw.split(':');
+        }
+
+        // --- CRYPTO LOGIC ---
+        async function sha256(text) {
+            const buffer = new TextEncoder().encode(text);
+            const hash = await crypto.subtle.digest('SHA-256', buffer);
+            return bufferToBase64(hash);
+        }
+
+        async function wrapKey(rawKey, pin) {
+            const pinHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pin));
+            const wrappingKey = await crypto.subtle.importKey('raw', pinHash, { name: 'AES-GCM' }, false, ['encrypt']);
+            const iv = crypto.getRandomValues(new Uint8Array(12));
+            const encryptedKey = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, wrappingKey, rawKey);
+            const combined = new Uint8Array(iv.byteLength + encryptedKey.byteLength);
+            combined.set(iv); combined.set(new Uint8Array(encryptedKey), 12);
+            return bufferToBase64(combined.buffer);
+        }
+
+        async function unwrapKey(wrappedB64, pin) {
+            const combined = base64ToBuffer(wrappedB64);
+            const iv = combined.slice(0, 12);
+            const data = combined.slice(12);
+            const pinHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pin));
+            const wrappingKey = await crypto.subtle.importKey('raw', pinHash, { name: 'AES-GCM' }, false, ['decrypt']);
+            return await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, wrappingKey, data);
+        }
+
+        // --- UI LOGIC ---
+        function logToTerminal(msg) {
+            const log = document.getElementById('terminalLog');
+            if(!log) return;
+            const line = document.createElement('div');
+            line.className = "mb-1 border-l-2 border-cyber/30 pl-2 opacity-90";
+            line.innerHTML = `> ${msg}`;
+            log.appendChild(line);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function togglePinInputs() {
+            const checked = document.getElementById('usePin').checked;
+            const container = document.getElementById('pinInputs');
+            container.style.opacity = checked ? "1" : "0.5";
+            container.style.pointerEvents = checked ? "auto" : "none";
+        }
+
         function generateSessionHex() {
             const hex = Math.floor(Math.random() * 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
-            document.getElementById('sessionHex').innerText = `0x${hex}`;
+            const el = document.getElementById('sessionHex');
+            if (el) el.innerText = `0x${hex}`;
         }
 
         function handleFileSelect() {
-            if (fileInput.files.length > 0) {
-                selectedFile = fileInput.files[0];
-                document.getElementById('dropZone').classList.add('hidden');
+            const input = document.getElementById('fileInput');
+            if (input.files.length > 0) {
+                selectedFile = input.files[0];
+                document.getElementById('dropZoneContent').classList.add('hidden');
+                document.getElementById('terminal').classList.remove('hidden');
                 document.getElementById('fileInfo').classList.remove('hidden');
+                document.getElementById('pinSetup').classList.remove('hidden');
                 document.getElementById('fileNameDisplay').innerText = selectedFile.name;
                 document.getElementById('uploadBtn').classList.remove('hidden');
+                
+                logToTerminal(`TARGET ACQUIRED: ${selectedFile.name}`);
+                logToTerminal(`SIZE: ${(selectedFile.size / 1024 / 1024).toFixed(2)} MB`);
+                logToTerminal("READY FOR INJECTION...");
             }
         }
 
-        function clearSelection() {
-            fileInput.value = ''; selectedFile = null;
-            document.getElementById('dropZone').classList.remove('hidden');
-            document.getElementById('fileInfo').classList.add('hidden');
-            document.getElementById('uploadBtn').classList.add('hidden');
-            document.getElementById('linkContainer').classList.add('hidden');
-        }
+        function clearSelection() { location.reload(); }
 
         function copyLink() {
             const linkInput = document.getElementById('shareLinkInput');
             linkInput.select();
             document.execCommand("copy");
-            alert("LINK_COPIED_TO_CLIPBOARD");
+            const btn = document.querySelector('button[onclick="copyLink()"]');
+            const originalIcon = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-check text-green-400"></i>';
+            setTimeout(() => btn.innerHTML = originalIcon, 2000);
         }
 
+        function executeNuke() {
+            logToTerminal("DURESS_CODE_DETECTED. PURGING_SESSION...");
+            localStorage.clear(); sessionStorage.clear();
+            document.cookie = "session_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            document.body.innerHTML = `
+                <div class="min-h-screen flex items-center justify-center p-6 bg-black">
+                    <div class="text-center space-y-6 animate-pulse">
+                        <i class="fa-solid fa-triangle-exclamation text-6xl text-red-600"></i>
+                        <h2 class="text-2xl font-black text-white font-mono tracking-tighter uppercase">Fatal_Error_404</h2>
+                        <p class="font-mono text-[10px] text-gray-600 uppercase tracking-widest">Resource zeroized or link expired.</p>
+                        <button onclick="location.href='/'" class="text-cyber font-mono text-[10px] underline">RETURN_TO_BASE</button>
+                    </div>
+                </div>`;
+        }
+
+        // --- UPLOAD ---
         async function handleUpload() {
             if (!selectedFile) return;
             const burnActive = document.getElementById('burnToggle').checked;
+            const usePin = document.getElementById('usePin').checked;
+            const mPin = document.getElementById('masterPin').value;
+            const dPin = document.getElementById('duressPin').value;
+
+            if (usePin && (!mPin || !dPin)) { alert("Please set both Master and Duress PINs."); return; }
 
             document.getElementById('uploadBtn').classList.add('hidden');
+            document.getElementById('pinSetup').classList.add('hidden');
             document.getElementById('progressContainer').classList.remove('hidden');
-            const status = document.getElementById('uploadStatus');
             const progressBarFill = document.getElementById('progressBarFill');
-            const progressText = document.getElementById('progressText');
 
-            status.innerText = "LOCAL_ENCRYPTING...";
-            
+            logToTerminal("GENERATING AES-GCM-256 KEY...");
             const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
-            const exportedKey = await crypto.subtle.exportKey('raw', key);
-            const base64Key = bufferToBase64(exportedKey);
+            const rawKey = await crypto.subtle.exportKey('raw', key);
+            
+            let finalKeyB64, dPinHash = "0", pinFlag = "0";
+            if (usePin) {
+                logToTerminal("WRAPPING_KEY_WITH_MASTER_PIN...");
+                finalKeyB64 = await wrapKey(rawKey, mPin);
+                dPinHash = await sha256(dPin);
+                pinFlag = "1";
+            } else {
+                finalKeyB64 = bufferToBase64(rawKey);
+            }
 
+            logToTerminal("INITIATING CLIENT-SIDE ENCRYPTION...");
             let iv = crypto.getRandomValues(new Uint8Array(12));
             const encryptedBlobs = [new Blob([iv])]; 
-
-            progressBarFill.style.width = '15%';
 
             for (let offset = 0; offset < selectedFile.size; offset += CHUNK_SIZE) {
                 const chunk = await selectedFile.slice(offset, offset + CHUNK_SIZE).arrayBuffer();
@@ -232,10 +387,11 @@
                 encryptedBlobs.push(new Blob([encryptedChunk]));
                 iv = new Uint8Array(encryptedChunk).slice(-12); 
             }
+            logToTerminal("ENCRYPTION COMPLETE. PACKAGING BLOB...");
 
             const finalPayload = new Blob(encryptedBlobs);
-            status.innerText = "UPLOADING_TUNNEL...";
-
+            logToTerminal("ESTABLISHING SECURE TUNNEL TO SERVER...");
+            
             const formData = new FormData();
             formData.append("file", finalPayload, "encrypted.bin");
 
@@ -245,82 +401,154 @@
             xhr.upload.onprogress = (event) => {
                 if (event.lengthComputable) {
                     const percent = Math.round((event.loaded / event.total) * 100);
-                    progressBarFill.style.width = Math.max(15, percent) + '%';
-                    progressText.innerText = Math.max(15, percent) + '%';
+                    progressBarFill.style.width = percent + '%';
+                    document.getElementById('progressText').innerText = percent + '%';
                 }
             };
 
             xhr.onload = () => {
                 if (xhr.status === 200) {
+                    logToTerminal("UPLOAD SUCCESSFUL. HANDSHAKE COMPLETE.");
                     const data = JSON.parse(xhr.responseText);
-                    const shareUrl = `${window.location.origin}/#${data.fileId}|${base64Key}|${encodeURIComponent(selectedFile.name)}`;
+                    const expiry = data.expiry || (Math.floor(Date.now() / 1000) + 10800);
+                    
+                    // URL Encoding and Colon delimiters for safe sharing
+                    const encKey = encodeURIComponent(finalKeyB64);
+                    const encName = encodeURIComponent(selectedFile.name);
+                    const encDuress = encodeURIComponent(dPinHash);
+                    
+                    const shareUrl = `${window.location.origin}/#${data.fileId}:${encKey}:${encName}:${expiry}:${pinFlag}:${encDuress}`;
+                    
                     document.getElementById('progressContainer').classList.add('hidden');
                     document.getElementById('linkContainer').classList.remove('hidden');
                     document.getElementById('shareLinkInput').value = shareUrl;
-                    if(data.burned) {
-                        document.getElementById('uploadSuccessHeader').innerHTML = '<i class="fa-solid fa-fire text-burn mr-1"></i> protocol_burn_enabled';
-                        document.getElementById('uploadSuccessHeader').classList.add('text-burn');
-                    }
+                    document.getElementById('sysStatus').innerText = "LINK_SECURED";
+                    document.getElementById('sysStatus').classList.remove('text-green-400');
+                    document.getElementById('sysStatus').classList.add('text-cyber');
+
+                    document.getElementById("qrcode").innerHTML = "";
+                    new QRCode(document.getElementById("qrcode"), { text: shareUrl, width: 128, height: 128, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
                 } else {
-                    status.innerText = "UPLOAD_CRITICAL_FAILURE";
-                    progressBarFill.classList.add('bg-red-500');
+                    logToTerminal("ERROR: SERVER REJECTED CONNECTION.");
+                    document.getElementById('uploadStatus').innerText = "FAILED";
+                    document.getElementById('uploadStatus').classList.add('text-red-500');
                 }
             };
             xhr.send(formData);
         }
 
+        // --- DOWNLOAD ---
+        function runCountdown(expiry) {
+            const display = document.getElementById('countdownDisplay');
+            const tick = () => {
+                const diff = expiry - Math.floor(Date.now() / 1000);
+                if (diff <= 0) {
+                    display.innerText = "STATUS: ASSET DESTROYED";
+                    document.getElementById('downloadBtn').disabled = true;
+                    document.getElementById('downloadBtn').classList.add('opacity-50', 'cursor-not-allowed');
+                    return;
+                }
+                const h = Math.floor(diff / 3600), m = Math.floor((diff % 3600) / 60), s = diff % 60;
+                display.innerText = `SELF-DESTRUCT IN: ${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+            };
+            tick(); setInterval(tick, 1000);
+        }
+
         async function handleDownload() {
+            const hash = getHashData();
+            if (hash[4] === "1") {
+                document.getElementById('pinModal').classList.remove('hidden');
+                document.getElementById('decryptionPin').focus();
+            } else {
+                executeDownload(hash[0], decodeURIComponent(hash[1]), decodeURIComponent(hash[2]));
+            }
+        }
+
+        async function submitPin() {
+            const pin = document.getElementById('decryptionPin').value;
+            if(!pin) return;
+            
+            const hash = getHashData();
+            const dPinHash = decodeURIComponent(hash[5]);
+            const wrappedKeyB64 = decodeURIComponent(hash[1]);
+            
+            const enteredHash = await sha256(pin);
+            if (enteredHash === dPinHash) { executeNuke(); return; }
+
+            try {
+                const rawKey = await unwrapKey(wrappedKeyB64, pin);
+                document.getElementById('pinModal').classList.add('hidden');
+                executeDownload(hash[0], null, decodeURIComponent(hash[2]), rawKey);
+            } catch (e) {
+                alert("ACCESS_DENIED: INCORRECT PIN");
+                document.getElementById('decryptionPin').value = "";
+            }
+        }
+
+        async function executeDownload(fileId, keyB64, name, rawKeyBuffer = null) {
             const status = document.getElementById('downloadStatus');
             const downloadBtn = document.getElementById('downloadBtn');
             downloadBtn.disabled = true;
-            status.innerText = "AUTHORIZING...";
+            status.innerText = "AUTHORIZING_NODE...";
+            status.className = "font-mono text-[9px] text-yellow-400 uppercase tracking-widest";
             
             try {
-                const hashData = window.location.hash.substring(1).split('|');
-                const fileId = hashData[0];
-                const base64Key = hashData[1];
-                const originalName = decodeURIComponent(hashData[2]);
+                const res = await fetch(`/download/${fileId}`);
+                if (res.status === 403) throw new Error("SECURITY ALERT: DEVICE/NETWORK MISMATCH");
+                if (res.status === 404) throw new Error("FILE NOT FOUND OR ALREADY BURNED");
+                if (!res.ok) throw new Error("CONNECTION FAILURE");
+                
+                const payload = await res.arrayBuffer();
+                status.innerText = "DECRYPTING_LOCALLY...";
+                status.className = "font-mono text-[9px] text-cyber uppercase tracking-widest";
+                
+                let aesKey;
+                if (rawKeyBuffer) {
+                    aesKey = await crypto.subtle.importKey('raw', rawKeyBuffer, { name: 'AES-GCM' }, false, ['decrypt']);
+                } else {
+                    aesKey = await crypto.subtle.importKey('raw', base64ToBuffer(keyB64), { name: 'AES-GCM' }, false, ['decrypt']);
+                }
 
-                const response = await fetch(`/download/${fileId}`);
-                if (!response.ok) throw new Error("LINK_EXPIRED_OR_DESTROYED");
-                const encryptedPayload = await response.arrayBuffer();
-
-                status.innerText = "LOCAL_DECRYPTING...";
-                const rawKey = base64ToBuffer(base64Key);
-                const key = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, true, ['decrypt']);
-
-                let iv = new Uint8Array(encryptedPayload, 0, 12);
+                let iv = new Uint8Array(payload, 0, 12);
                 let offset = 12;
-                const decryptedChunks = [];
-                const cipherChunkSize = CHUNK_SIZE + 16; 
-
-                while (offset < encryptedPayload.byteLength) {
-                    const end = Math.min(offset + cipherChunkSize, encryptedPayload.byteLength);
-                    const chunk = encryptedPayload.slice(offset, end);
-                    const decryptedChunk = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, key, chunk);
-                    decryptedChunks.push(new Blob([decryptedChunk]));
+                let chunks = [];
+                
+                while (offset < payload.byteLength) {
+                    const end = Math.min(offset + CHUNK_SIZE + 16, payload.byteLength);
+                    const chunk = payload.slice(offset, end);
+                    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, aesKey, chunk);
+                    chunks.push(new Blob([decrypted]));
                     iv = new Uint8Array(chunk).slice(-12);
                     offset = end;
                 }
 
-                const blob = new Blob(decryptedChunks);
+                const blob = new Blob(chunks);
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
-                a.href = url; a.download = originalName; a.click();
+                a.href = url; a.download = name; a.click();
                 
-                status.innerHTML = '<span class="text-green-400">DECRYPTION_SUCCESS</span>';
+                status.innerHTML = '<span class="text-green-400"><i class="fa-solid fa-check"></i> DECRYPTION SUCCESSFUL</span>';
                 downloadBtn.style.display = 'none';
-            } catch (error) {
-                status.innerHTML = `<span class="text-red-500">${error.message}</span>`;
+
+            } catch (err) {
+                status.innerHTML = `<span class="text-red-500 font-bold"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message}</span>`;
                 downloadBtn.disabled = false;
             }
         }
 
         window.onload = () => {
             generateSessionHex(); 
-            if (window.location.hash.includes('|')) {
+            
+            document.getElementById('decryptionPin').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') submitPin();
+            });
+
+            const hash = getHashData();
+            if (hash.length >= 3 && hash[0]) {
                 document.getElementById('uploadBox').classList.add('hidden');
                 document.getElementById('downloadBox').classList.remove('hidden');
+                document.title = "ZERO-TRACE // DECRYPT";
+                if (hash[3]) runCountdown(parseInt(hash[3]));
             }
         };
     </script>
